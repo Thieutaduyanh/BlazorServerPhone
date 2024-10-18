@@ -1,0 +1,86 @@
+﻿@page "/category/edit/{id:int}"
+@using BlazorServerApp.Data
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<h3>Edit Category: @category.CatName</h3>
+<EditForm Model="category" OnValidSubmit="HandleUpdateCategory">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label class="form-label">Name</label>
+        <InputText @bind-Value=category.CatName class="form-control" />
+        <ValidationMessage For="() => category.CatName" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Status</label>
+        <InputSelect @bind-Value=category.IsDeleted class="form-control">
+            <option value="0">Active</option>
+            <option value="1">Deleted</option>
+            <ValidationMessage For="() => category.IsDeleted" />
+        </InputSelect>
+    </div>
+
+    <div class="mb-3">
+        <Button Type="ButtonType.Submit" Color="ButtonColor.Success">Save</Button>
+        <Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="category">Back</Button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+    private Category category = new Category();
+
+    protected override void OnParametersSet() // Lay thong tin cu theo ID
+    {
+        if (id != 0)
+        {
+            category =  GetCategoryById();
+        }
+    }
+
+    private Category GetCategoryById()
+    {
+        Category c = new Category();
+        try
+        {
+            string SqlGetCategory = $"SELECT * FROM category WHERE cat_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetCategory;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                c.CatId = reader.GetInt32("cat_id");
+                c.CatName = reader.GetString("cat_name");
+                c.IsDeleted = reader.GetInt32("isDeleted");
+            }
+
+            conn.Close();
+
+        }
+        catch (Exception p) { }
+        return c;
+    }
+
+    private void HandleUpdateCategory()
+    {
+        string name = category.CatName;
+        int status = category.IsDeleted;
+        try
+        {
+            string SqlUpdate = $"UPDATE category SET cat_name = '{name}', isDeleted = {status} WHERE cat_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlUpdate;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("category");
+        }
+        catch (Exception ex) {}
+    }
+}

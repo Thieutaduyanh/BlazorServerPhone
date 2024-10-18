@@ -1,0 +1,107 @@
+﻿@page "/category"
+@using BlazorServerApp.Data
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<PageTitle>Category</PageTitle>
+<h3>List Of Category</h3>
+<Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="category/create" Class="mb-3">Create a new category</Button>
+
+<Grid TItem="Category"
+      Class="table table-hover table-bordered table-striped"
+      DataProvider="CategoryDataProvider"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="3"
+      AllowSorting="true"
+      AllowSelection="true"
+      Responsive="true">
+
+    <GridColumn TItem="Category" HeaderText="Id" PropertyName="Id" SortKeySelector="item => item.CatId">
+        @context.CatId
+    </GridColumn>
+
+    <GridColumn TItem="Category" HeaderText="Category Name" PropertyName="Name" SortKeySelector="item => item.CatName">
+        @context.CatName
+    </GridColumn>
+
+    <GridColumn TItem="Category" HeaderText="Status" PropertyName="IsDeleted" SortKeySelector="item => item.IsDeleted">
+        @if (context.IsDeleted == 1)
+        {
+            <Badge Color="BadgeColor.Danger" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Deleted</Badge>
+        }
+        else
+        {
+            <Badge Color="BadgeColor.Success" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Acitve</Badge>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Category" HeaderText="Action">
+        <Button Type="ButtonType.Link" Color="ButtonColor.Success" To=@($"category/edit/{context.CatId}")>Edit</Button>
+        <Button Type="ButtonType.Button" Color="ButtonColor.Danger" @onclick="(CatId) => DeleteCategory(context.CatId)"
+                Disabled="@(context.IsDeleted ==1)">
+            Delete
+        </Button>
+    </GridColumn>
+</Grid>
+
+@code {
+    private List<Category> categories;
+
+    protected override void OnInitialized()
+    {
+        categories = GetCategories();
+    }
+
+    private async Task<GridDataProviderResult<Category>> CategoryDataProvider(GridDataProviderRequest<Category> request)
+    {
+        if (categories is null) // pull employees only one time for client-side filtering, sorting, and paging
+            categories = GetCategories(); // call a service or an API to pull the employees
+
+        return await Task.FromResult(request.ApplyTo(categories));
+    }
+
+    private static List<Category> GetCategories()
+    {
+        List<Category> list = new List<Category>();
+        try
+        {
+            string SqlGetCategories = "SELECT * FROM category ORDER BY cat_id";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetCategories;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                Category c = new Category();
+                c.CatId = reader.GetInt32("cat_id");
+                c.CatName = reader.GetString("cat_name");
+                c.IsDeleted = reader.GetInt32("isDeleted");
+                list.Add(c);
+            }
+
+            conn.Close();
+
+        }
+        catch (Exception p) { }
+        return list;
+    }
+    private void DeleteCategory(int CatID)
+    {
+        try
+        {
+            string SqlDelete = $"UPDATE category SET isDeleted = 1 WHERE cat_id = {CatID}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlDelete;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("category", forceLoad: true);
+        }
+        catch (Exception ex) { }
+    }
+}
+

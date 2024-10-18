@@ -1,0 +1,153 @@
+﻿@using BlazorServerApp.Data
+@page "/product/edit/{id:int}"
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<h3>Edit Product: @product.ProductName</h3>
+<EditForm Model="product" OnValidSubmit="HandleUpdateProduct">
+    <DataAnnotationsValidator />
+    <div class="row">
+        <div class="col-6">
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <InputText @bind-Value=product.ProductName class="form-control" />
+                <ValidationMessage For="() => product.ProductName" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Category Id</label>
+                <InputNumber @bind-Value=product.CategoryId class="form-control" @oninput="ValidateCategoryId" />
+                <ValidationMessage For="() => product.CategoryId" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <InputText @bind-Value=product.Description class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Status</label>
+                <InputSelect @bind-Value=product.IsDeleted class="form-control">
+                    <option value="0">Active</option>
+                    <option value="1">Deleted</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <Button Type="ButtonType.Submit" Color="ButtonColor.Success">Save</Button>
+                <Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="product">Back</Button>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="mb-3">
+                <label class="form-label">Image</label>
+                <InputFile class="form-control" OnChange="HanldeSelectedFile"></InputFile>
+                @if (avatarUrl != "")
+                {
+                    <img src="@avatarUrl" style="max-width:500px" />
+                }
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+    private Product product = new Product(); // luu tru thong tin san pham hien tai 
+    private IBrowserFile selectedFile = null; // luu tru tep hinh anh duoc chon 
+    private string avatarUrl = ""; // luu tru url cua hinh anh san pham 
+
+    protected override void OnParametersSet() // Lay thong tin cu theo ID moi khi ID thay doi , cap nhat vao doi tuong product 
+    {
+        if (id != 0)
+        {
+            product = GetProductById();
+        }
+    }
+
+    private Product GetProductById()
+    {
+        Product p = new Product();
+        try
+        {
+            string SqlGetProduct = $"SELECT * FROM product WHERE product_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetProduct;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                p.ProductId = reader.GetInt32("product_id");
+                p.ProductName = reader.GetString("product_name");
+                p.CategoryId = reader.GetInt32("cate_id");
+                p.Description = reader.GetString("description");
+                p.ProductImage = reader.GetString("product_image");
+                p.IsDeleted = reader.GetInt32("isDeleted");
+            }
+            conn.Close();
+        }
+        catch (Exception ex) { }
+        return p;
+    }
+    private async Task HanldeSelectedFile(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        var resizeFile = await e.File.RequestImageFileAsync("image/jpeg", 500, 500);
+        var buffer = new byte[resizeFile.Size];
+        await resizeFile.OpenReadStream().ReadAsync(buffer);
+        avatarUrl = $"data:image/jpeg;base64,{Convert.ToBase64String(buffer)}";
+        // await UploadSelectedFile(selectedFile);
+    }
+
+
+    private async Task HandleUpdateProduct()
+    {
+        if (selectedFile != null)
+        {
+            await UploadSelectedFile(selectedFile);
+        }
+        string name = product.ProductName;
+        int cate_id = product.CategoryId;
+        string description = product.Description;
+        string avatar = product.ProductImage;
+        int status = product.IsDeleted;
+        try
+        {
+            string SqlUpdateProduct = $"UPDATE product SET product_name = '{name}', cate_id ={cate_id}, description = '{description}', product_image = '{avatar}', isDeleted = {status} WHERE product_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlUpdateProduct;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("product?success=true");
+        }
+        catch (Exception ex) { }
+    }
+
+    private async Task UploadSelectedFile(IBrowserFile file)
+    {
+        var fileName = file.Name;
+        var folderPath = Path.Combine("wwwroot", "uploads"); //wwwroot/uploads
+        var fileParh = Path.Combine(folderPath, fileName); // await : ham dong bo, doi day du thong tin
+        Directory.CreateDirectory(folderPath);
+        using (var fileStream = new FileStream(fileParh, FileMode.Create))
+        {
+            await file.OpenReadStream(10000000).CopyToAsync(fileStream);
+        }
+        product.ProductImage = $"uploads/{fileName}"; // luu tru thong tin file moi
+    }
+    private void ValidateCategoryId(ChangeEventArgs e)
+    {
+        var value = e.Value.ToString();
+        if (int.TryParse(value, out var result) && result < 1)
+        {
+            product.CategoryId = 1;
+        }
+    }
+
+}

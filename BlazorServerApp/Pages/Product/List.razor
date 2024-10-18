@@ -1,0 +1,120 @@
+﻿@page "/product"
+@using BlazorServerApp.Data
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<PageTitle>Product</PageTitle>
+<h3>List Of Product</h3>
+<Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="product/create" Class="mb-3">Create a new product</Button>
+
+<Grid TItem="Product"
+      Class="table table-hover table-bordered table-striped"
+      DataProvider="ProductDataProvider"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="3"
+      AllowSorting="true"
+      AllowSelection="true"
+      Responsive="true">
+
+    <GridColumn TItem="Product" HeaderText="Id" PropertyName="Id" SortKeySelector="item => item.ProductId">
+        @context.ProductId
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Product Name" PropertyName="ProductName" SortKeySelector="item =>item.ProductName">
+        @context.ProductName
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Product Image" PropertyName="ProductImage" SortKeySelector="item =>item.ProductImage">
+        <img src="@context.ProductImage" width="100px" height="120px" />
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Status" PropertyName="IsDeleted" SortKeySelector="item => item.IsDeleted">
+        @if (context.IsDeleted == 1)
+        {
+            <Badge Color="BadgeColor.Danger" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Deleted</Badge>
+        }
+        else
+        {
+            <Badge Color="BadgeColor.Success" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Acitve</Badge>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Category Name" PropertyName="CategoryName" SortKeySelector="item =>item.CategoryName">
+        @context.CategoryName
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Description" PropertyName="Description" SortKeySelector="item =>item.Description">
+        @context.Description
+    </GridColumn>
+
+    <GridColumn TItem="Product" HeaderText="Action">
+        <Button Type="ButtonType.Link" Color="ButtonColor.Success" To=@($"product/edit/{context.ProductId}")>Edit</Button>
+        <Button Type="ButtonType.Button" Color="ButtonColor.Danger" @onclick="(ProdudctId) => DeleteProduct(context.ProductId)"
+                Disabled="@(context.IsDeleted ==1)">
+            Delete
+        </Button>
+    </GridColumn>
+</Grid>
+
+@code {
+    private List<Product> products;
+
+    protected override void OnInitialized()
+    {
+        products = GetProducts();
+    }
+
+    private async Task<GridDataProviderResult<Product>> ProductDataProvider(GridDataProviderRequest<Product> request)
+    {
+        if (products is null)
+            products = GetProducts();
+
+        return await Task.FromResult(request.ApplyTo(products));
+    }
+
+    private static List<Product> GetProducts()
+    {
+        List<Product> list = new List<Product>();
+        try
+        {
+            string SqlGetProducts = "SELECT product.product_id, product.product_name, product.product_image, product.isDeleted, product.description, category.cat_name FROM product JOIN category ON product.cate_id = category.cat_id  ORDER BY product.product_id";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetProducts;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                Product p = new Product();
+                p.ProductId = reader.GetInt32("product_id");
+                p.ProductName = reader.GetString("product_name");
+                p.ProductImage = reader.GetString("product_image");
+                p.IsDeleted = reader.GetInt32("isDeleted");
+                p.CategoryName = reader.GetString("cat_name");
+                p.Description = reader.GetString("description");
+                list.Add(p);
+            }
+            conn.Close();
+        }
+        catch (Exception p) { }
+        return list;
+    }
+    private void DeleteProduct(int ProductId)
+    {
+        try
+        {
+            string SqlDeleteProduct = $"UPDATE product SET isDeleted = 1 WHERE product_id = {ProductId}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlDeleteProduct;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("product", forceLoad: true);
+        }
+        catch (Exception ex) { }
+    }
+}
+

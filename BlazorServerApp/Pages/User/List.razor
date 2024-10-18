@@ -1,0 +1,132 @@
+﻿@page "/user"
+@using BlazorServerApp.Data
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<PageTitle>User</PageTitle>
+<h3>List Of User</h3>
+<Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="user/create" Class="mb-3">Create a new user</Button>
+
+<Grid TItem="User"
+      Class="table table-hover table-bordered table-striped"
+      DataProvider="UserDataProvider"
+      AllowFiltering="true"
+      AllowPaging="true"
+      PageSize="3"
+      AllowSorting="true"
+      AllowSelection="true"
+      Responsive="true">
+
+    <GridColumn TItem="User" HeaderText="Id" PropertyName="Id" SortKeySelector="item => item.UserId">
+        @context.UserId
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="User Name" PropertyName="Name" SortKeySelector="item => item.UserName">
+        @context.UserName
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="User Email" PropertyName="Email" SortKeySelector="item => item.UserEmail">
+        @context.UserEmail
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="User Password" PropertyName="Password" SortKeySelector="item => item.UserPassword">
+        @context.UserPassword
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="User Level" PropertyName="Level" SortKeySelector="item => item.UserLevel">
+        @if (context.UserLevel == 0)
+        {
+            <Badge Color="BadgeColor.Danger" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Admin</Badge>
+        }
+        else if (context.UserLevel == 1)
+        {
+            <Badge Color="BadgeColor.Primary" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Member</Badge>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="User Avatar" PropertyName="Avatar" SortKeySelector="item =>item.UserAvatar">
+        <img src="@context.UserAvatar" width="100px" height="120px"/> 
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Status" PropertyName="IsDeleted" SortKeySelector="item => item.IsDeleted">
+        @if (context.IsDeleted == 1)
+        {
+            <Badge Color="BadgeColor.Danger" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Deleted</Badge>
+        }
+        else
+        {
+            <Badge Color="BadgeColor.Success" Class="p-2" IndicatorType="BadgeIndicatorType.RoundedPill">Acitve</Badge>
+        }
+    </GridColumn>
+
+    <GridColumn TItem="User" HeaderText="Action">
+        <Button Type="ButtonType.Link" Color="ButtonColor.Success" To=@($"user/edit/{context.UserId}")>Edit</Button>
+        <Button Type="ButtonType.Button" Color="ButtonColor.Danger" @onclick="(UserId) => DeleteCategory(context.UserId)"
+                Disabled="@(context.IsDeleted ==1)">
+            Delete
+        </Button>
+    </GridColumn>
+</Grid>
+
+@code {
+    private List<User> users;
+
+    protected override void OnInitialized()
+    {
+        users = GetUsers();
+    }
+
+    private async Task<GridDataProviderResult<User>> UserDataProvider(GridDataProviderRequest<User> request)
+    {
+        if (users is null) 
+            users = GetUsers(); 
+
+        return await Task.FromResult(request.ApplyTo(users));
+    }
+
+    private static List<User> GetUsers()
+    {
+        List<User> list = new List<User>();
+        try
+        {
+            string SqlGetUsers = "SELECT * FROM user ORDER BY user_id";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetUsers;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                User u = new User();
+                u.UserId = reader.GetInt32("user_id");
+                u.UserName = reader.GetString("user_name");
+                u.UserEmail = reader.GetString("user_email");
+                u.UserPassword = reader.GetString("user_password");
+                u.UserLevel = reader.GetInt32("user_level");
+                u.UserAvatar = reader.GetString("user_avatar");
+                u.IsDeleted = reader.GetInt32("isDeleted");
+                list.Add(u);
+            }
+            conn.Close();
+        }
+        catch (Exception p) { }
+        return list;
+    }
+    private void DeleteCategory(int UserId)
+    {
+        try
+        {
+            string SqlDelete = $"UPDATE user SET isDeleted = 1 WHERE user_id = {UserId}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlDelete;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("user", forceLoad: true);
+        }
+        catch (Exception ex) { }
+    }
+}
+

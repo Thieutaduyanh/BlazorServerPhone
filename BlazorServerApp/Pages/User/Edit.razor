@@ -1,0 +1,155 @@
+﻿@using BlazorServerApp.Data
+@page "/user/edit/{id:int}"
+@using MySql.Data.MySqlClient
+<!-- dieu huong -->
+@inject NavigationManager navigationManager
+
+<h3>Edit User: @user.UserName</h3>
+<EditForm Model="user" OnValidSubmit="HandleUpdateUser">
+    <DataAnnotationsValidator />
+    <div class="row">
+        <div class="col-6">
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <InputText @bind-Value=user.UserName class="form-control" />
+                <ValidationMessage For="() => user.UserName" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText @bind-Value=user.UserEmail class="form-control" />
+                <ValidationMessage For="() => user.UserEmail" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText @bind-Value=user.UserPassword class="form-control" />
+                <ValidationMessage For="() => user.UserPassword" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Level</label>
+                <InputSelect @bind-Value=user.UserLevel class="form-control">
+                    <option value="0">Admin</option>
+                    <option value="1">Member</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Status</label>
+                <InputSelect @bind-Value=user.IsDeleted class="form-control">
+                    <option value="0">Active</option>
+                    <option value="1">Deleted</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <Button Type="ButtonType.Submit" Color="ButtonColor.Success">Save</Button>
+                <Button Type="ButtonType.Link" Color="ButtonColor.Primary" To="user">Back</Button>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="mb-3">
+                <label class="form-label">Avatar</label>
+                <InputFile class="form-control" OnChange="HanldeSelectedFile"></InputFile>
+                @if (avatarUrl != "")
+                {
+                    <img src="@avatarUrl" style="max-width:500px" />
+                }
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+    private User user = new User();
+    private IBrowserFile selectedFile = null;
+    private string avatarUrl = "";
+
+    protected override void OnParametersSet() // Lay thong tin cu theo ID
+    {
+        if (id != 0)
+        {
+            user = GetUserById();
+        }
+    }
+
+    private User GetUserById()
+    {
+        User u = new User();
+        try
+        {
+            string SqlGetUser = $"SELECT * FROM user WHERE user_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlGetUser;
+            MySqlDataReader reader = cmd.ExecuteReader();
+            if (reader.Read())
+            {
+                u.UserId = reader.GetInt32("user_id");
+                u.UserName = reader.GetString("user_name");
+                u.UserEmail = reader.GetString("user_email");
+                u.UserPassword = reader.GetString("user_password");
+                u.UserLevel = reader.GetInt32("user_level");
+                u.UserAvatar = reader.GetString("user_avatar");
+                u.IsDeleted = reader.GetInt32("isDeleted");
+            }
+            conn.Close();
+        }
+        catch (Exception p) { }
+        return u;
+    }
+    private async Task HanldeSelectedFile(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        var resizeFile = await e.File.RequestImageFileAsync("image/jpeg", 500, 500);
+        var buffer = new byte[resizeFile.Size];
+        await resizeFile.OpenReadStream().ReadAsync(buffer);
+        avatarUrl = $"data:image/jpeg;base64,{Convert.ToBase64String(buffer)}";
+       // await UploadSelectedFile(selectedFile);
+    }
+
+
+    private async Task HandleUpdateUser()
+    {
+        if (selectedFile != null)
+        {
+            await UploadSelectedFile(selectedFile);
+        }
+        string name = user.UserName;
+        string email = user.UserEmail;
+        string password = user.UserPassword;
+        int level = user.UserLevel;
+        string avatar = user.UserAvatar;
+        int status = user.IsDeleted;
+        try
+        {
+            string SqlUpdateUser = $"UPDATE user SET user_name = '{name}', user_email = '{email}', user_password='{password}', user_level ={level}, user_avatar = '{avatar}', isDeleted = {status} WHERE user_id = {id}";
+            MySqlConnection conn = DBMySQL.GetMySqlConnection();
+            conn.Open();
+            MySqlCommand cmd = conn.CreateCommand();
+            cmd.CommandText = SqlUpdateUser;
+            cmd.ExecuteNonQuery();
+            conn.Close();
+            navigationManager.NavigateTo("user");
+        }
+        catch (Exception ex) { }
+    }
+
+    private async Task UploadSelectedFile(IBrowserFile file)
+    {
+        var fileName = file.Name;
+        var folderPath = Path.Combine("wwwroot","uploads"); //wwwroot/uploads
+        var fileParh = Path.Combine(folderPath, fileName); // await : ham dong bo, doi day du thong tin
+        Directory.CreateDirectory(folderPath);
+        using (var fileStream = new FileStream(fileParh, FileMode.Create))
+        {
+            await file.OpenReadStream(10000000).CopyToAsync(fileStream);
+        }
+        user.UserAvatar = $"uploads/{fileName}"; // luu tru thong tin file moi
+    }
+}
